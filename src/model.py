@@ -53,6 +53,22 @@ class MathSolver:
         Returns:
             Generated text
         """
+        # [VALIDATOR FIX - Attempt 1]
+        # [PROBLEM]: Model generates extremely repetitive outputs, getting stuck in loops
+        # [CAUSE]: Missing repetition_penalty parameter in generation config
+        # [FIX]: Add repetition_penalty=1.1 to discourage repetitive outputs
+        #
+        # [OLD CODE]:
+        # outputs = self.model.generate(
+        #     **inputs,
+        #     max_new_tokens=max_tokens,
+        #     temperature=temperature if temperature > 0 else 1.0,
+        #     do_sample=temperature > 0,
+        #     pad_token_id=self.tokenizer.pad_token_id,
+        #     eos_token_id=self.tokenizer.eos_token_id,
+        # )
+        #
+        # [NEW CODE]:
         inputs = self.tokenizer(prompt, return_tensors="pt", padding=True)
         inputs = {k: v.to(self.model.device) for k, v in inputs.items()}
         
@@ -64,6 +80,7 @@ class MathSolver:
                 do_sample=temperature > 0,
                 pad_token_id=self.tokenizer.pad_token_id,
                 eos_token_id=self.tokenizer.eos_token_id,
+                repetition_penalty=1.1,
             )
         
         # Decode only the generated part (skip input)
