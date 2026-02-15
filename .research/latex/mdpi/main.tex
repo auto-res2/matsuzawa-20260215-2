@@ -20,8 +20,8 @@
 \daterevised{ } % Comment out if no revised date
 \dateaccepted{ } 
 \datepublished{ } 
-%\datecorrected{} % For corrected papers: ``Corrected: XXX`` date in the original paper.
-%\dateretracted{} % For retracted papers: ``Retracted: XXX`` date in the original paper.
+%\datecorrected{} % For corrected papers: "Corrected: XXX" date in the original paper.
+%\dateretracted{} % For retracted papers: "Retracted: XXX" date in the original paper.
 %\doinum{} % Used for some special journals, like molbank
 %\pdfoutput=1 % Uncommented for upload to arXiv.org
 %\CorrStatement{yes}  % For updates
@@ -38,7 +38,7 @@
 
 %=================================================================
 % Full title of the paper (Capitalized)
-\Title{CPV-CoT\@: Cross-Representation Self-Verification for Word-Problem Reasoning Under Bounded Model Calls}
+\Title{Cross-Perspective Verification Under Bounded Model Calls: Negative Results on GSM8K and SVAMP}
 
 % Author Orchid ID: enter ID or remove command
 \newcommand{\orcidauthorA}{0000-0000-0000-000X} % Add \orcidA{} behind the author's name
@@ -58,7 +58,7 @@ $^{1}$ \quad Affiliation 1; e-mail@e-mail.com\\
 $^{2}$ \quad Affiliation 2; e-mail@e-mail.com}
 
 % Contact information of the corresponding author
-\corres{Correspondence: e-mail@e-mail.com; Tel.\@: (optional; include country code; if there are multiple corresponding authors, add author initials) +xx-xxxx-xxx-xxxx (F.L.)}
+\corres{Correspondence: e-mail@e-mail.com; Tel.: (optional; include country code; if there are multiple corresponding authors, add author initials) +xx-xxxx-xxx-xxxx (F.L.)}
 
 % Current address and/or shared authorship
 %\firstnote{Current address: Affiliation.}
@@ -72,7 +72,7 @@ $^{2}$ \quad Affiliation 2; e-mail@e-mail.com}
 %\conference{} % An extended version of a conference paper
 
 % Abstract (Do not insert blank lines, i.e. \\)
-\abstract{Chain-of-Thought (CoT) prompting can improve multi-step math word-problem solving, but its reliability remains limited: a single free-form rationale often entangles implicit assumptions about quantities, units, and constraints, making it hard for the model to detect when its own final number violates the problem statement. This is especially problematic when inference budgets rule out large self-consistency ensembles and when “confidently wrong” answers are costly. We study whether a prompt-only verification procedure can improve correctness by forcing a representation change between solving and checking while keeping computation bounded. We propose CPV-CoT\@, which (1) generates a narrative Forward-CoT solution, (2) independently re-solves the same problem in an equations-only format, and (3) conditionally invokes a constraint-focused adjudicator only when the two candidate answers disagree, with an explicit abstention option. We implement CPV-CoT and compare it to a single-pass zero-shot CoT baseline using meta-llama\slash Meta-Llama-3.1-8B-Instruct{} with greedy decoding on 200-example test subsets of GSM8K and SVAMP\@. Contrary to our hypothesis, CPV-CoT reduces accuracy while increasing average model calls by about 2.4--2.5 times. These negative results emphasize that representation diversity alone is insufficient for robust self-verification when the verifier is the same model and is not grounded by external execution.}
+\abstract{Chain-of-Thought (CoT) prompting can improve multi-step reasoning, yet it remains brittle on numeric word problems because a single fluent rationale can silently entangle assumptions about equations, units, and constraints. This makes constraint violations hard to detect and encourages correlated errors when a model is asked to self-check in the same narrative style. We study CPV-CoT, a prompt-only, bounded-call procedure that enforces a representation change between solving and verification. CPV-CoT generates (1) a narrative step-by-step solution, (2) an independent equations-only re-solve, and (3) a short constraint-based adjudication only when the two candidate answers disagree, with an explicit abstention option. Using greedy decoding with Meta-Llama-3.1-8B-Instruct, we compare CPV-CoT against a single-pass zero-shot CoT baseline on $200$-example test subsets of GSM8K and SVAMP. CPV-CoT increases cost to about $2.39$-$2.51$ model calls per problem but reduces accuracy in these runs (GSM8K $0.625$ vs $0.720$; SVAMP $0.720$ vs $0.805$). We quantify disagreement-triggering frequency from logged call counts and discuss why cross-perspective prompting can fail under greedy decoding, clarifying what must be measured and improved for prompt-only verification to become reliably beneficial.}
 
 % Keywords
 \keyword{keyword 1; keyword 2; keyword 3 (List three to ten pertinent keywords specific to the article; yet reasonably common within the subject discipline.)}
@@ -105,7 +105,7 @@ $^{2}$ \quad Affiliation 2; e-mail@e-mail.com}
 %\encyclopediadef{For entry manuscripts only: please provide a brief overview of the entry title instead of an abstract.}
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% Different journals have different requirements. Please check the specific journal guidelines in the ``Instructions for Authors`` on the journal's official website.
+% Different journals have different requirements. Please check the specific journal guidelines in the "Instructions for Authors" on the journal's official website.
 %\addhighlights{yes}
 %\renewcommand{\addhighlights}{%
 %
@@ -128,127 +128,211 @@ $^{2}$ \quad Affiliation 2; e-mail@e-mail.com}
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \section{Introduction}
 
-Large language models (LLMs) can be prompted to produce intermediate reasoning steps that improve performance on multi-step tasks, including grade-school arithmetic word problems~\cite{wei-2022-chain}. In this setting, the model must translate narrative text into a structured set of quantities and relationships, perform several arithmetic operations, and preserve the constraints implied by the story (for example, non-negativity, integer counts, and totals that must match). Despite the apparent transparency of step-by-step explanations, CoT outputs frequently end in incorrect final numbers, often with high apparent confidence.
+Large language models (LLMs) can become more accurate on multi-step problems when prompted to externalize intermediate reasoning. Chain-of-Thought (CoT) prompting formalized this phenomenon by demonstrating that eliciting natural-language rationales can substantially improve performance on arithmetic, commonsense, and symbolic reasoning tasks, including grade-school math word problems \cite{wei-2022-chain}. These gains, however, do not imply reliability. In practice, models can produce coherent explanations that contain subtle arithmetic slips, inconsistent variable bindings, or quiet violations of the original problem constraints, such as totals that do not sum correctly, counts that become non-integers, or units that drift mid-solution. For safety- or decision-critical settings, the core problem is not only whether an LLM can generate a plausible reasoning narrative, but whether it can detect when its own output violates the implicit contract defined by the question.
 
-This paper starts from a specific hypothesis about why CoT remains brittle even when it looks coherent. A single free-form rationale tends to interleave multiple latent commitments—variable definitions, unit conversions, intermediate equations, and constraint assumptions—without making them explicit as a checkable “contract.” When an error occurs, it is often unclear whether it is a local arithmetic slip, an earlier misread of the story, or a violation of a global constraint. Moreover, when the same model is asked to “verify” its answer, verification is typically elicited in the same narrative style as the original reasoning, making generator and verifier failures correlated.
+A key obstacle is representational. A single free-form rationale mixes many latent commitments: which quantities correspond to which symbols, which constraints are essential, which unit conversions are performed, and where rounding or simplification occurs. Because these commitments are encoded in prose, verification becomes difficult to operationalize. A common remedy is ``self-checking,'' asking the model to verify its previous solution. Yet if the verifier is prompted in the same narrative style and decoded greedily, solver and verifier can share failure modes. Informally, a model that made a mistake while telling one story is not necessarily well positioned to find that mistake by telling a second, similarly structured story.
 
-A natural response is to use additional computation to reduce error: for example, sampling multiple solutions and selecting the majority answer. However, such approaches can be prohibitively expensive in budget-constrained deployments and are not always available for on-device or latency-sensitive use. We therefore ask a narrower question: can a prompt-only method, with a small and bounded number of model calls per problem, improve reliability by changing the representation used during verification?
+This paper investigates a prompt-only alternative designed to introduce a deliberate representation change for verification while keeping inference cost bounded and auditable. The motivating analogy is a common human practice: solve in one way, then validate from a different angle, and spend additional effort primarily when the two perspectives disagree. We instantiate this as CPV-CoT (Cross-Perspective Verification Chain-of-Thought), a three-stage procedure that uses at most $3$ model calls per problem. First, CPV-CoT produces a standard narrative step-by-step solution (Forward-CoT) with an explicit final numeric answer. Second, it independently re-solves the same problem in an equations-only style intended to compress reasoning into explicit algebraic and arithmetic transformations. Third, if the two candidate answers disagree (or one cannot be extracted), CPV-CoT triggers a short adjudication prompt that plugs candidate answers back into the problem constraints and outputs a discrete decision: choose answer A, choose answer B, or abstain (NONE).
 
-We propose CPV-CoT (Cross-Perspective Verification Chain-of-Thought), a bounded-call procedure inspired by a human habit: solve the problem once, then validate it from a different angle. The key idea is that verification should not be “another pass of the same story-like CoT.” Instead, CPV-CoT enforces two complementary perspectives: a narrative Forward-CoT solution and an independent equations-only solution that forbids prose. If the two extracted numeric answers agree, CPV-CoT accepts the answer immediately. If they disagree (or one is missing), CPV-CoT triggers a short adjudication step in which the model is instructed to plug candidate answers back into the original constraints and choose between candidate A, candidate B, or abstain.
+The method is closely related to the CoT paradigm in that it elicits explicit intermediate reasoning, but it targets a more specific failure mode: the brittleness of verification when both solving and checking are performed in the same narrative representation. CoT work already highlights that prompting format affects both correctness and interpretability \cite{wei-2022-chain}. Our hypothesis is narrower and testable: verification should not merely be ``another narrative pass,'' but should shift representation (narrative versus equations-only) to reduce correlated solver-verifier errors. CPV-CoT also enforces a conditional compute budget: it always uses $2$ calls (forward plus equations-only) and issues the third adjudication call only on disagreement.
 
-To evaluate this hypothesis with minimal confounds, we adopt a controlled experimental setting: greedy decoding, fixed prompts, and small but reproducible test subsets. Using meta-llama\slash Meta-Llama-3.1-8B-Instruct{}, we compare a single-pass zero-shot CoT baseline to CPV-CoT on 200 test examples from GSM8K and 200 test examples from SVAMP\@. The results are negative. On GSM8K, the baseline achieves 0.720 accuracy (144\slash 200{}), while CPV-CoT achieves 0.625 (125\slash 200{}). On SVAMP, the baseline achieves 0.805 (161\slash 200{}), while CPV-CoT achieves 0.720 (144\slash 200{}). CPV-CoT also increases the average number of calls per problem from exactly 1.00 to 2.51 on GSM8K and 2.385 on SVAMP, implying frequent disagreements that triggered adjudication.
+We evaluate CPV-CoT on GSM8K and SVAMP, two benchmarks central to early CoT studies \cite{wei-2022-chain,zhang-2022-automatic}. To isolate the effect of prompting structure rather than sampling variance, we use greedy decoding for all methods. The evaluation pipeline is fully specified in code: dataset preprocessing, prompt templates, answer extraction and normalization, and exact-match scoring. While the broader project description mentions an alternative model family, the recorded experiments reported here use Meta-Llama-3.1-8B-Instruct and conclusions are scoped to that setting.
 
-These findings matter for two reasons. First, they directly test a plausible and widely applicable intuition: that “multiple views” and verification can be created purely through prompting. Second, they clarify a limitation of prompt-only self-checking when the verifier is the same base model and no external execution is available: creating representational diversity can increase disagreement and compute without reliably improving the final decision.
+Empirically, CPV-CoT does not improve end-to-end accuracy in our recorded runs. On $200$ GSM8K test problems, a single-pass zero-shot CoT baseline attains $0.720$ accuracy, while CPV-CoT attains $0.625$. On $200$ SVAMP test problems, the baseline attains $0.805$ accuracy, while CPV-CoT attains $0.720$. CPV-CoT also increases average calls per problem from $1.00$ to approximately $2.39$-$2.51$. At the same time, the control flow behaves as intended: disagreements between the two perspectives are common, triggering adjudication frequently.
 
 Contributions:
-- We define CPV-CoT, a prompt-only, bounded-call inference procedure that combines a representation shift (narrative versus equations-only) with a disagreement-triggered adjudication step and an explicit abstention option.
-- We provide an end-to-end evaluation pipeline for GSM8K and SVAMP subsets, including dataset-specific preprocessing, answer extraction and normalization, and logging of inference cost.
-- We report negative results under greedy decoding with meta-llama\slash Meta-Llama-3.1-8B-Instruct{}: CPV-CoT reduces accuracy by 8.5--9.5 percentage points while increasing average calls per problem by about 2.4--2.5 times, and we quantify the implied disagreement frequency from call counts.
+\begin{itemize}
+\item \textbf{Bounded cross-perspective procedure.} We formalize CPV-CoT, a prompt-only cross-perspective verification procedure combining a narrative solve, an equations-only re-solve, and a disagreement-triggered constraint adjudicator under a hard upper bound of $3$ model calls.
+\item \textbf{Controlled evaluation pipeline.} We provide a fully specified evaluation pipeline (preprocessing, prompts, extraction and normalization, and scoring) and run controlled greedy-decoding comparisons on GSM8K and SVAMP with an $8$B instruction model.
+\item \textbf{Negative results with call-count diagnostics.} We report and analyze negative results: CPV-CoT underperforms a single-pass zero-shot CoT baseline while using roughly $2.4$-$2.5$ times as many model calls, and we quantify disagreement-triggering frequency from logged call counts.
+\end{itemize}
 
-Future work should treat these results as diagnostic rather than final: the next step is to instrument the procedure with verification-specific metrics (disagreement rate by type, abstention rate, and wrong-non-abstain rate) and to explore adjudication mechanisms that are more directly grounded in constraint satisfaction than additional free-form generation.
+These findings motivate future work that treats cross-perspective prompting as an empirical design space rather than an assumed improvement. In particular, follow-up studies should log disagreement and abstention behavior explicitly, diagnose when verification prompts degrade candidate quality, and examine how decoding strategies interact with bounded multi-step verification.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \section{Related Work}
 
-Our work is about prompt-induced reasoning and, more narrowly, about verification strategies for numeric word problems under strict inference budgets. We therefore focus on prior work that studies how prompting elicits reasoning steps and how prompt construction affects robustness.
+\subsection{Chain-of-Thought prompting for arithmetic reasoning}
+CoT prompting demonstrated that eliciting intermediate natural-language reasoning can improve performance on multi-step tasks, including arithmetic word problems, and that the effect becomes more pronounced with model scale \cite{wei-2022-chain}. Our baseline uses a simple zero-shot CoT instruction (``solve step by step'' and provide a final number), closely matching the practical setting where no demonstrations are available. CPV-CoT shares the premise that intermediate reasoning is useful, but it differs in objective: it attempts to make verification less correlated with generation by forcing a change in representation between the first solution attempt and the verification attempt.
 
-Chain-of-Thought prompting is the foundational technique. Wei et al.\ show that prompting LLMs to generate intermediate reasoning steps can substantially improve performance on arithmetic and symbolic reasoning tasks, including GSM8K and SVAMP, and that these benefits grow with model scale~\cite{wei-2022-chain}. CPV-CoT operates within the same general paradigm (prompt-only inference) but targets a different failure mode: not whether the model can produce a coherent chain of thought, but whether it can detect and resolve constraint violations when its own reasoning is wrong. In this sense, CPV-CoT is closer to “verification prompting” than to elicitation alone.
+\subsection{Automatic construction of CoT demonstrations}
+Auto-CoT reduces the manual effort of writing few-shot CoT demonstrations by clustering questions, selecting diverse exemplars, and using zero-shot CoT to generate rationales that become in-context demonstrations \cite{zhang-2022-automatic}. Conceptually, Auto-CoT improves the ``prompt prior'' through better demonstrations, whereas CPV-CoT allocates additional test-time compute per instance to produce multiple candidate answers and reconcile them. The approaches therefore differ in assumptions and where compute is spent. Auto-CoT typically assumes access to a pool of questions to cluster and build a demonstration set; CPV-CoT is entirely per-instance and requires no access to other questions at inference. While both are applicable to GSM8K and SVAMP, our experiments do not evaluate Auto-CoT because our goal is to isolate the effects of cross-perspective verification under greedy decoding rather than optimize in-context exemplars.
 
-Auto-CoT addresses a distinct source of brittleness: prompt sensitivity and the cost of manually crafting high-quality CoT demonstrations~\cite{zhang-2022-automatic}. Auto-CoT automatically constructs a diverse set of demonstrations by clustering questions and generating rationales, then uses those demonstrations for single-pass inference. Compared with CPV-CoT, Auto-CoT spends extra model calls upfront to build in-context exemplars, whereas CPV-CoT spends extra calls at inference time for each query to obtain multiple candidate answers and adjudicate disagreements. This difference implies different cost profiles: Auto-CoT overhead can be amortized when demonstrations are reused, while CPV-CoT overhead scales linearly with the number of solved problems.
+\subsection{Prompt-only verification and conditional compute}
+CPV-CoT departs from common ``self-checking'' patterns primarily through (i) an explicit representation shift (narrative versus equations-only), and (ii) conditional compute, where adjudication is triggered only on internal disagreement. In principle, conditional compute can be important under tight inference budgets: verification is expensive, and spending additional calls uniformly on all problems may be wasteful. Our results underscore a complementary point: conditional compute can increase cost predictably, but it does not guarantee better accuracy. Additional calls also create additional failure opportunities (e.g., formatting and extraction failures, or an adjudicator selecting the wrong candidate), and the equations-only view can be systematically weaker than the narrative view under a fixed decoding regime.
 
-Our negative results provide a cautionary contrast to the general intuition that multi-view prompting necessarily improves reliability. Multi-view prompting is only helpful if (i) the alternative view is sufficiently accurate to produce informative disagreements and (ii) disagreements can be resolved by a dependable decision rule. In our setting, the adjudicator is the same base model and is not anchored by external computation, so it may rationalize incorrect candidates rather than reject them. Additionally, the forced “equations-only” format may itself be a performance bottleneck under greedy decoding, increasing disagreement frequency and thus compute.
-
-Finally, a boundary of our comparison must be stated. The reference set provided here does not include dedicated verifier-model methods, execution-based checking, or sampling-based self-consistency approaches. Our experiments therefore compare CPV-CoT only to a single-pass zero-shot CoT baseline. The paper’s contribution is not a broad state-of-the-art study, but a controlled test of whether a specific representation-shift verification heuristic improves outcomes under bounded calls, and an empirical demonstration that, under the tested conditions, it does not.
+\subsection{Negative evidence relative to the CoT narrative}
+A central message of the original CoT literature is that producing explicit intermediate reasoning can improve end-task accuracy \cite{wei-2022-chain}. Our study highlights that adding more explicit reasoning steps is not automatically beneficial when those steps are composed into a multi-call pipeline and scored only by extracted final numbers. In our runs, CPV-CoT introduces new places where errors can occur, and the intended mechanism (representation change reduces correlated errors) is not realized as an end-to-end improvement. This motivates treating prompt-only verification procedures as systems whose components (solver, verifier, adjudicator, and extractor) must be evaluated jointly, under the same decoding and parsing constraints used in deployment.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \section{Background}
 
-We study numeric question answering for grade-school math word problems. Each example consists of a natural-language question q and a ground-truth numeric answer y. A method must generate text that contains a final numeric answer, and evaluation reduces that text to a canonical numeric representation for comparison.
+We study prompt-only methods for solving and verifying numeric word problems, focusing on settings where the final output must be a single numeric value that can be checked automatically. This section defines the task, the evaluation protocol used by our pipeline, and the prompting concepts required to interpret CPV-CoT.
 
-Problem setting and notation. Let M denote an instruction-tuned LLM used as a conditional text generator. A prompting method is a bounded sequence of calls to M\@. For call i, the method constructs a prompt p\\_i that includes the original question q and may include intermediate artifacts from earlier calls. The model returns a text output t\\_i = M (p\\_i). An answer extractor E maps each t\\_i to a candidate numeric string a\\_i = E (t\\_i); if no parseable number is found, E returns an empty string. A normalizer N maps numeric strings into a canonical form used for matching.
+\subsection{Problem setting}
+A dataset consists of pairs $(q, y)$, where $q$ is a natural-language math word problem and $y$ is the correct numeric answer. A method $M$ maps $q$ to a generated response $r$ in free-form text. Because $r$ may include prose and intermediate steps, evaluation uses an answer extraction function $E(r)$ that returns a normalized numeric string $\hat{y}$ (or an empty string if no answer can be extracted). The primary metric is accuracy, defined as the fraction of problems for which $\hat{y}$ matches $y$ after normalization.
 
-In our implementation, E uses a hierarchy of simple regex rules: (1) prefer an explicit marker of the form “Final Answer: <number>”, (2) else search for a phrase like “answer is <number>”, (3) else fall back to the last numeric token in the output. The normalizer N removes commas and attempts to parse a numeric string as a float; if the float is an integer, it is rendered without a decimal point. For agreement tests and correctness, we use exact string equality after normalization, with a fallback numeric comparison using absolute tolerance 1e-6 when both sides can be parsed as floats.
+\subsection{Answer extraction and normalization}
+Our evaluation implements deterministic extraction to reduce sensitivity to surface formatting. Given a model output, it first searches for an explicit marker of the form ``Final Answer: $\langle$number$\rangle$'' (case-insensitive). If absent, it searches for a pattern like ``the answer is $\langle$number$\rangle$.'' If neither matches, it falls back to the last number token present anywhere in the output. Extracted numeric strings are normalized by removing commas and stripping whitespace; the code attempts to parse the result as a float and re-render it so that integer-valued floats become integer strings. Correctness is determined primarily by exact match of normalized strings, with an additional numeric comparison tolerance: if both predicted and gold strings can be parsed as floats, they are considered matching when the absolute difference is below $10^{-6}$.
 
-Baseline: single-pass zero-shot CoT\@. The baseline uses one model call with a prompt that requests step-by-step reasoning and instructs the model to end with the explicit “Final Answer: <number>” marker. This baseline is consistent with the general observation that eliciting intermediate reasoning can help multi-step arithmetic performance~\cite{wei-2022-chain}. Importantly, it uses exactly one model call per problem.
+\subsection{Chain-of-Thought prompting}
+CoT prompting elicits intermediate reasoning steps in natural language and has been shown to improve arithmetic reasoning, particularly for large models \cite{wei-2022-chain}. In our experiments, the baseline is a single-pass, zero-shot CoT instruction that requests step-by-step reasoning and requires the final answer in the explicit ``Final Answer:'' format to facilitate extraction.
 
-Verification under bounded compute. The motivation for CPV-CoT is that many word-problem errors are not merely arithmetic slips; they involve misinterpreting a constraint in the narrative (for example, mixing totals and rates, miscounting items, or ignoring implicit non-negativity). When the solution is expressed as a single narrative, these constraints often remain implicit. Prompting the model to “verify” in the same narrative style may repeat the same hidden mistake. A principled way to reduce correlated generator–verifier errors is to force a representation change between the first solution and the check, while keeping the number of calls bounded.
+\subsection{Verification as a representation problem}
+The motivation for CPV-CoT is that a narrative rationale is not directly testable as a contract: it can describe constraints without forcing them into an operational form that is easy to re-check. CPV-CoT therefore introduces an equations-only representation for verification. The intent is to compress the same problem into explicit equations and arithmetic transformations while discouraging prose that could reproduce the same narrative mistakes.
 
-This paper’s setting therefore emphasizes two constraints: (i) prompt-only inference, without fine-tuning or external tools, and (ii) a small, fixed upper bound on the number of model calls per problem. In this setting, the core methodological question becomes whether representation diversity plus a deterministic accept-or-adjudicate rule can improve end-task accuracy.
+\subsection{Bounded compute and conditional verification}
+CPV-CoT bounds inference cost in model calls. Instead of using many sampled solutions or iterative refinement, it uses a small number of calls with a conditional third call executed only when internal disagreement is detected. This design makes cost predictable and allows some diagnostics to be inferred from call counts.
+
+\subsection{Datasets}
+GSM8K is a benchmark of grade-school math word problems whose answers are embedded in an explanation string and marked with ``\#\#\#\# $\langle$number$\rangle$,'' enabling reliable gold extraction \cite{wei-2022-chain}. SVAMP was designed to test robustness to linguistic variation in arithmetic word problems and has been used in CoT evaluations \cite{wei-2022-chain,zhang-2022-automatic}. SVAMP examples store the prompt across two fields, Body (context) and Question (query). Our preprocessing concatenates Body and Question to form the full problem statement; this is treated as an essential assumption because using only one field yields incomplete problems and invalidates evaluation.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \section{Method}
 
-CPV-CoT (Cross-Perspective Verification Chain-of-Thought) is a prompt-only inference procedure defined by three prompts and a deterministic decision rule. It uses the same base model for all steps and does not rely on fine-tuning, external tools, or execution.
+CPV-CoT (Cross-Perspective Verification Chain-of-Thought) is a prompt-only inference procedure that generates two candidate answers using different response formats and, when needed, adjudicates disagreement by a constraint-focused check. It is implemented as deterministic control flow around standard text generation, using greedy decoding.
 
-Given a question q, CPV-CoT produces two candidate solutions in complementary surface representations.
+\subsection{Control flow}
+Given a question $q$, CPV-CoT performs up to $3$ model calls.
 
-First call: Forward-CoT (narrative solve). The model is prompted to solve the problem using step-by-step natural-language reasoning and to end with “Final Answer: <number>”. The output is t\\_fwd and the extracted candidate answer is a\\_fwd = E (t\\_fwd).
+\begin{algorithm}[H]
+\caption{CPV-CoT inference with bounded calls}
+\begin{algorithmic}[1]
+\State \textbf{Input:} question $q$
+\State $f \leftarrow \mathrm{GenerateForwardCoT}(q)$
+\State $a \leftarrow E(f)$
+\State $e \leftarrow \mathrm{GenerateEquationSolve}(q)$
+\State $b \leftarrow E(e)$
+\If{$a \neq \emptyset$ \textbf{and} $b \neq \emptyset$ \textbf{and} $\mathrm{Agree}(a,b)$}
+  \State \textbf{return} $a$
+\Else
+  \State $z \leftarrow \mathrm{GenerateAdjudication}(q, a, b)$
+  \State $c \leftarrow \mathrm{ParseChoice}(z)$ \Comment{$c \in \{A,B,\mathrm{NONE}\}$}
+  \If{$c = A$}
+    \State \textbf{return} $a$
+  \ElsIf{$c = B$}
+    \State \textbf{return} $b$
+  \Else
+    \State \textbf{return} $\emptyset$
+  \EndIf
+\EndIf
+\end{algorithmic}
+\end{algorithm}
 
-Second call: Equation-Solve (compressed view). The model is prompted to solve the same question using only mathematical equations and expressions, explicitly forbidding narrative prose, and to end with “Final Answer: <number>”. The output is t\\_eqn and the extracted candidate answer is a\\_eqn = E (t\\_eqn). This forced representation shift is intended to change how the model externalizes its reasoning and thereby surface inconsistencies that might be hidden in narrative text.
+\subsection{Stage prompts and decisions}
+\textbf{Forward-CoT (narrative solve).} The model is prompted: ``Solve this math problem using clear step-by-step reasoning. Explain your thought process in natural language.'' It is required to end with the explicit string ``Final Answer: $\langle$number$\rangle$.'' The returned text is stored as \texttt{forward\_reasoning}, and a candidate numeric answer $a$ is extracted using the deterministic extraction rules.
 
-Deterministic accept rule. If both a\\_fwd and a\\_eqn are non-empty and N (a\\_fwd) equals N (a\\_eqn) (either exact match after normalization or numeric agreement within absolute tolerance 1e-6), CPV-CoT returns that shared value and stops.
+\textbf{Equation-Solve (equations-only re-solve).} The same question is re-issued under a representation constraint: ``Solve this math problem using ONLY mathematical equations and expressions. Do NOT use narrative prose - only write equations, calculations, and the final answer.'' It must again end with ``Final Answer: $\langle$number$\rangle$.'' The returned text is stored as \texttt{equation\_reasoning}, and a second candidate answer $b$ is extracted.
 
-Third call (conditional): Constraint adjudication. If the two candidates do not agree or one is missing, CPV-CoT triggers an adjudicator prompt. The adjudicator is shown the original question q and the two candidate numeric answers. It is instructed to check each candidate by plugging it back into the original constraints (units, counts, totals) and must output a discrete decision “Choice: A”, “Choice: B”, or “Choice: NONE”. If the adjudicator chooses A or B, CPV-CoT returns the corresponding candidate value. If the adjudicator chooses NONE, CPV-CoT abstains.
+\textbf{Disagreement adjudication (constraint plugging).} If $a$ and $b$ agree, CPV-CoT accepts immediately. Agreement is checked first by exact string match of the normalized answers, and second by numeric comparison: if both parse as floats and $|a-b| < 10^{-6}$, they are treated as agreeing. If they do not agree (or if either answer is missing), CPV-CoT triggers an adjudication prompt that presents the original problem and both candidate answers and instructs the model to check which answer satisfies the problem constraints by ``plugging each candidate answer back into the problem's constraints.'' The adjudicator must output ``Choice: A'', ``Choice: B'', or ``Choice: NONE''. The implementation maps these to decisions \texttt{ACCEPT\_A}, \texttt{ACCEPT\_B}, or \texttt{ABSTAIN}, and returns the corresponding final answer (or an empty string on abstention).
 
-Answer extraction and comparison details. Answer extraction and normalization follow the background definition of E and N. Within the model wrapper used for the experiments, numeric normalization attempts float parsing, removes commas, and collapses integer-valued floats (for example, “2.0” becomes “2”). The agreement test between candidates uses exact normalized-string match and then a numeric tolerance check when both are parseable floats.
+\subsection{Bounded compute}
+Let $N$ be the number of problems and $D$ the number of disagreements that trigger adjudication. Forward-CoT and Equation-Solve always consume $2N$ calls. Adjudication consumes exactly $D$ additional calls because it is executed at most once per problem. Therefore $\mathrm{total\_calls} = 2N + D$ and $\mathrm{avg\_calls\_per\_problem} = 2 + D/N$, with a hard upper bound of $3$ calls per problem.
 
-Bounded call complexity and implied disagreement. CPV-CoT uses at most three model calls per problem. It always makes two calls (Forward-CoT and Equation-Solve) and makes the third call only when disagreement is detected. If d is the fraction of problems that trigger adjudication, then the expected number of calls per problem is 2 + d. In our experiments we log average calls per problem, so d can be inferred as (avg\_calls\_per\_problem -- 2).
+\subsection{Implementation details from the code}
+CPV-CoT is implemented in a model wrapper that exposes \texttt{solve\_zero\_shot\_cot} and \texttt{solve\_cpv\_cot}. Both use the same underlying \texttt{generate} function with greedy decoding (temperature $0.0$ with \texttt{do\_sample} disabled) and a maximum new-token budget of \texttt{max\_new\_tokens}$=512$. The CPV-CoT function returns a structured record including the two intermediate outputs, the extracted candidate answers, the adjudication artifact when executed (prompt, output, decision), the final selected answer, and \texttt{num\_calls}. This structure enables auditing of compute and supports post-hoc computation of diagnostics even when they are not logged during inference.
 
-Abstention and scoring. The prompt protocol includes an explicit abstention option (Choice: NONE). However, in the saved implementation the abstention decision is mapped to an empty predicted answer string, and the primary metric (accuracy) counts empty answers as incorrect. This design choice is appropriate for measuring correctness but can obscure potential safety-relevant benefits (for example, reducing wrong non-abstaining outputs). Consequently, in this paper we treat abstention as a method behavior but cannot quantify it because abstention-rate metrics were not logged in the saved run summaries.
+\subsection{Intended mechanism and evaluation scope}
+CPV-CoT operationalizes the idea that verification should involve a representation change to reduce correlated solver-verifier errors. The disagreement signal between narrative and equations-only views is used as a trigger to spend additional compute. Our experiments test whether this mechanism translates into higher end-to-end accuracy when the full pipeline is run under greedy decoding and scored by regex-based answer extraction.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \section{Experimental Setup}
 
-We evaluate whether CPV-CoT improves the correctness of final numeric answers on arithmetic word problems, under greedy decoding and a bounded-call budget. The pipeline includes dataset preprocessing, prompt-based inference for each method, answer extraction and normalization, and metric logging.
+We evaluate CPV-CoT against a single-pass zero-shot CoT baseline on grade-school math word problems. The goal is to test whether a prompt-only verification procedure improves correctness under a bounded number of model calls, while holding decoding and answer extraction constant.
 
-Datasets and splits. We use two arithmetic word-problem benchmarks that are commonly used in CoT prompting studies~\cite{wei-2022-chain,zhang-2022-automatic}. For both datasets, we evaluate on the first 200 examples of the test split.
+\subsection{Datasets and sample sizes}
+We evaluate on GSM8K and SVAMP, both commonly used in CoT evaluations \cite{wei-2022-chain,zhang-2022-automatic}. For each dataset, we run on a $200$-example subset from the test split (\texttt{max\_samples}$=200$). GSM8K is loaded from the ``gsm8k'' dataset with the ``main'' configuration and test split. SVAMP is loaded from ``ChilleD/SVAMP'' using its test split.
 
-GSM8K\@: We use the gsm8k “main” test split. The ground-truth answers are stored as free-form text that includes a marker “\#\#\#\# <number>”. Preprocessing extracts the number following “\#\#\#\#”, with a fallback to the last number in the answer text.
+\subsection{Preprocessing and gold answers}
+GSM8K provides answers as explanation strings; preprocessing extracts the number following the ``\#\#\#\# $\langle$number$\rangle$'' marker and normalizes it. SVAMP stores the problem statement in two fields, Body and Question. Preprocessing always concatenates them with a space to form the full question string and normalizes the gold numeric answer field.
 
-SVAMP\@: We use the ChilleD\slash SVAMP{} test split. SVAMP problem statements are stored in two fields, “Body” (context) and “Question” (the query). Preprocessing always concatenates Body and Question into a single question string to avoid incomplete prompts; this is treated as a correctness-critical preprocessing step.
+\subsection{Model and decoding}
+All runs use the instruction-tuned causal language model \texttt{meta-llama/Meta-Llama-3.1-8B-Instruct}. Decoding is greedy: temperature is $0.0$, \texttt{do\_sample} is disabled, and each generation uses \texttt{max\_new\_tokens}$=512$. These settings are shared across baseline and proposed methods to isolate prompting effects.
 
-Model and decoding. All reported runs use meta-llama\slash Meta-Llama-3.1-8B-Instruct{}, as specified in the run configuration files. Generation uses greedy decoding with temperature set to 0.0 (implemented as do\\_sample = False in the model wrapper). Each model call generates up to 512 new tokens.
+\subsection{Compared methods}
+The baseline method is Zero-shot CoT (single-pass): one model call with a prompt requesting step-by-step reasoning and requiring the final answer in the explicit format ``Final Answer: $\langle$number$\rangle$.'' The proposed method is CPV-CoT: two required calls (Forward-CoT and Equation-Solve) plus an optional adjudication call when candidate answers disagree.
 
-Methods compared.
+\subsection{Evaluation and logged metrics}
+For each example, we extract the final numeric answer using the regex-based policy described in Background and score correctness with exact match after normalization, plus a float tolerance of $10^{-6}$ when parsing succeeds. If CPV-CoT abstains (empty output) or produces no parseable number, it is scored as incorrect for the primary accuracy metric. The inference code logs run-level metrics: accuracy, correct\_count, total\_samples, total\_calls, and avg\_calls\_per\_problem. Although CPV-CoT motivates logging disagreement and abstention rates, these diagnostics are not present in the recorded run summaries. However, because adjudication adds exactly one model call per disagreement, the number of disagreements can be inferred as $D = \mathrm{total\_calls} - 2N$.
 
-Zero-shot CoT (baseline): A single model call prompts the model to solve step by step and to output “Final Answer: <number>”. This method has a fixed inference cost of 1 call per problem.
-
-CPV-CoT (proposed): Two calls are always executed (Forward-CoT and Equation-Solve). A third call (adjudicator) is executed only when the extracted candidates do not agree or when a candidate is missing.
-
-Answer extraction, normalization, and correctness. Predicted answers are extracted from each model output by regex rules that prioritize the explicit final-answer marker and otherwise fall back to common phrases or the last numeric token. Predicted and ground-truth answers are normalized by removing commas and attempting float parsing. Correctness is determined by normalized equality, with a fallback numeric tolerance test using absolute error 1e-6.
-
-Metrics and logging. During inference, the script logs cumulative accuracy after each sample index and stores final metrics including accuracy, correct\_count, total\_samples, total\_calls, and average calls per problem (total\_calls divided by total\_samples). Although CPV-CoT is designed to expose disagreements and allow abstention, the saved run summaries do not include explicit disagreement rates, abstention rates, or adjudicator win rates. As a result, the quantitative evaluation in this paper focuses on the available metrics: accuracy and inference cost (calls per problem).
+\subsection{Orchestration and run identifiers}
+Each method-dataset pair is executed via a Hydra configuration with \texttt{batch\_size}$=1$. The run IDs are \texttt{comparative-1-llama8b-gsm8k} (baseline on GSM8K), \texttt{proposed-llama8b-gsm8k} (CPV-CoT on GSM8K), \texttt{comparative-2-llama8b-svamp} (baseline on SVAMP), and \texttt{proposed-llama8b-svamp} (CPV-CoT on SVAMP). Runs are tracked with Weights and Biases, and results are saved to JSON files containing aggregate metrics and per-example records (question, ground truth, predicted answer, correctness, and method-specific artifacts).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \section{Results}
 
-We report results for four runs: zero-shot CoT and CPV-CoT on GSM8K (n = 200) and SVAMP (n = 200). All runs use meta-llama\slash Meta-Llama-3.1-8B-Instruct{} with greedy decoding (temperature 0.0) and a maximum of 512 generated tokens per model call.
+This section reports all recorded results for GSM8K and SVAMP ($200$ examples each), comparing a single-pass zero-shot CoT baseline to CPV-CoT. All numerical values are taken directly from the logged run metrics.
 
-Experiment 1: GSM8K accuracy and inference cost. The zero-shot CoT baseline achieves 0.720 accuracy (144/200) with exactly 1.00 call per problem (200 total calls). CPV-CoT achieves 0.625 accuracy (125/200) with 2.51 calls per problem on average (502 total calls). This is an absolute decrease of 0.095 accuracy while using 2.51 times as many model calls. Because CPV-CoT always performs two calls and adds one adjudicator call only on disagreement, the observed average implies an adjudication-trigger (disagreement) rate of approximately 2.51 -- 2.00 = 0.51, or 51%.
+\subsection{Experiment 1: GSM8K}
+The zero-shot CoT baseline attains accuracy $0.720$ ($144/200$) with $\mathrm{avg\_calls\_per\_problem} = 1.00$ and $\mathrm{total\_calls} = 200$. CPV-CoT attains accuracy $0.625$ ($125/200$) with $\mathrm{avg\_calls\_per\_problem} = 2.51$ and $\mathrm{total\_calls} = 502$. Thus, CPV-CoT both increases inference cost and reduces accuracy in this configuration.
 
-For a simple post-hoc check of whether the observed decrease could plausibly be due to sampling noise at n = 200, we can compute an approximate two-proportion z test using the observed counts (144/200 versus 125/200). This yields a difference of --0.095 with an approximate standard error of 0.0467, giving z about --2.03 (p about 0.04). This calculation is only a rough diagnostic, but it suggests the drop is unlikely to be explained purely by random variation in the 200-item subset.
+Because CPV-CoT always executes exactly two calls per problem before optional adjudication, we can infer how often adjudication was triggered. With $N = 200$, the two mandatory stages cost $2N = 400$ calls. The logged $\mathrm{total\_calls}$ is $502$, so the excess is $D = 502 - 400 = 102$ adjudication calls. This implies a disagreement-trigger rate of $D/N = 102/200 = 0.51$ ($51\%$). The frequent trigger confirms that the representation shift (narrative versus equations-only) produces substantially different candidate answers, but the downstream reconciliation does not improve end-to-end correctness under greedy decoding.
 
-Figure 1: Cumulative accuracy over the first 200 GSM8K examples for the zero-shot CoT baseline run; higher values indicate better performance.\ (filename: comparative-1-llama8b-gsm8k\\_accuracy.pdf)
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.7\linewidth]{images/comparative-1-llama8b-gsm8k_accuracy.pdf}
+\caption{Cumulative accuracy over the first $200$ GSM8K test examples for the zero-shot CoT baseline; higher values indicate better performance.}
+\label{fig:gsm8k-baseline}
+\end{figure}
 
-Figure 2: Cumulative accuracy over the first 200 GSM8K examples for the CPV-CoT run; higher values indicate better performance.\ (filename: proposed-llama8b-gsm8k\\_accuracy.pdf)
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.7\linewidth]{images/proposed-llama8b-gsm8k_accuracy.pdf}
+\caption{Cumulative accuracy over the first $200$ GSM8K test examples for CPV-CoT; higher values indicate better performance.}
+\label{fig:gsm8k-cpv}
+\end{figure}
 
-Experiment 2: SVAMP accuracy and inference cost. The zero-shot CoT baseline achieves 0.805 accuracy (161/200) with 1.00 call per problem (200 total calls). CPV-CoT achieves 0.720 accuracy (144/200) with 2.385 calls per problem (477 total calls). This is an absolute decrease of 0.085 accuracy while using 2.385 times as many calls. The implied adjudication-trigger (disagreement) rate is approximately 2.385 -- 2.00 = 0.385, or 38.5%.
+\subsection{Experiment 2: SVAMP}
+On SVAMP, the baseline attains accuracy $0.805$ ($161/200$) with $\mathrm{avg\_calls\_per\_problem} = 1.00$ and $\mathrm{total\_calls} = 200$. CPV-CoT attains accuracy $0.720$ ($144/200$) with $\mathrm{avg\_calls\_per\_problem} = 2.385$ and $\mathrm{total\_calls} = 477$. CPV-CoT is again more expensive and less accurate.
 
-A similar post-hoc two-proportion calculation on SVAMP (161/200 versus 144/200) gives a difference of --0.085 with an approximate standard error of 0.0424, yielding z about --2.00 (p about 0.045). Again, this is not a preregistered statistical test, but it supports the qualitative conclusion that the regression is sizeable relative to the subset size.
+Inferring adjudication frequency, the mandatory two-stage cost is $2N = 400$ calls. With $\mathrm{total\_calls} = 477$, the excess is $D = 477 - 400 = 77$ adjudication calls, implying a disagreement-trigger rate of $77/200 = 0.385$ ($38.5\%$). SVAMP triggers adjudication less often than GSM8K in these runs, but CPV-CoT still underperforms the single-pass baseline.
 
-Figure 3: Cumulative accuracy over the first 200 SVAMP examples for the zero-shot CoT baseline run; higher values indicate better performance.\ (filename: comparative-2-llama8b-svamp\\_accuracy.pdf)
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.7\linewidth]{images/comparative-2-llama8b-svamp_accuracy.pdf}
+\caption{Cumulative accuracy over the first $200$ SVAMP test examples for the zero-shot CoT baseline; higher values indicate better performance.}
+\label{fig:svamp-baseline}
+\end{figure}
 
-Figure 4: Cumulative accuracy over the first 200 SVAMP examples for the CPV-CoT run; higher values indicate better performance.\ (filename: proposed-llama8b-svamp\\_accuracy.pdf)
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.7\linewidth]{images/proposed-llama8b-svamp_accuracy.pdf}
+\caption{Cumulative accuracy over the first $200$ SVAMP test examples for CPV-CoT; higher values indicate better performance.}
+\label{fig:svamp-cpv}
+\end{figure}
 
-Experiment 3: Cross-run comparison of quality and cost. The aggregated comparison plots summarize (i) cumulative accuracy trajectories across runs, (ii) final accuracy per run, and (iii) average calls per problem. Under the reported settings, CPV-CoT underperforms the baseline on both datasets and simultaneously consumes substantially more inference compute, so it is Pareto-dominated by single-pass zero-shot CoT.
+\subsection{Experiment 3: Cross-run comparison and compute trade-offs}
+For a summary across datasets, we compute macro-averages (simple mean across GSM8K and SVAMP). Baseline macro-average accuracy is $(0.720 + 0.805)/2 = 0.7625$. CPV-CoT macro-average accuracy is $(0.625 + 0.720)/2 = 0.6725$. For compute, the baseline uses exactly $1.00$ call per problem, while CPV-CoT uses $(2.51 + 2.385)/2 = 2.4475$ calls per problem on average. The aggregated run comparison also reports $\mathrm{best\_baseline} = 0.805$ and $\mathrm{best\_proposed} = 0.720$, reflecting that the highest accuracy among the recorded runs is achieved by the baseline on SVAMP.
 
-Figure 5: Cumulative accuracy comparison across all runs; higher values indicate better performance.\ (filename: comparison\\_accuracy.pdf)
+The evaluation script produced three additional summary plots. Figure~\ref{fig:comparison-accuracy} provides a run-wise view of cumulative accuracy over examples as logged. Figure~\ref{fig:comparison-accuracy-bar} summarizes final accuracies by run. Figure~\ref{fig:comparison-calls} compares average calls per problem; for this cost metric, lower values indicate better efficiency.
 
-Figure 6: Final accuracy comparison across all runs; higher values indicate better performance.\ (filename: comparison\\_accuracy\\_bar.pdf)
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.7\linewidth]{images/comparison_accuracy.pdf}
+\caption{Accuracy over time comparison plot across runs as logged; higher values indicate better performance.}
+\label{fig:comparison-accuracy}
+\end{figure}
 
-Figure 7: Average model calls per problem across runs as an inference-cost metric; lower values indicate better performance.\ (filename: comparison\\_calls.pdf)
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.7\linewidth]{images/comparison_accuracy_bar.pdf}
+\caption{Final accuracy bar chart comparing runs; higher values indicate better performance.}
+\label{fig:comparison-accuracy-bar}
+\end{figure}
 
-Limitations and interpretability of the negative result. The available metrics establish that CPV-CoT reduces end-task accuracy and increases cost through frequent adjudication triggers. However, the saved run summaries do not provide the verification-specific diagnostics needed to localize the failure mode. In particular, we do not have: (i) explicit disagreement rates defined at the candidate-answer level (beyond what can be inferred from average calls), (ii) abstention frequency (Choice: NONE) and its contribution to the accuracy drop, or (iii) adjudicator win rates, meaning how often adjudication selected the correct candidate when one of the two candidates was correct. Without these measurements, we cannot determine whether the regression is driven primarily by a weak equations-only solve, an unreliable adjudicator, the interaction of abstention with the accuracy metric, or a combination of these factors under greedy decoding.
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.7\linewidth]{images/comparison_calls.pdf}
+\caption{Average model calls per problem for each run; lower values indicate better performance for cost efficiency.}
+\label{fig:comparison-calls}
+\end{figure}
+
+\subsection{Limitations and fairness considerations}
+The comparison controls the model (Meta-Llama-3.1-8B-Instruct), decoding regime (greedy), token budget ($512$ new tokens), and answer extraction rules across methods, so the observed cost and accuracy differences are attributable to the prompting procedure and its additional calls. However, CPV-CoT introduces additional error channels that can plausibly explain degraded accuracy: each extra generation can produce an output that is difficult to parse into a single number under regex-based extraction; the equations-only view may be systematically weaker than the narrative view under greedy decoding; and the adjudicator is itself an unconstrained generation step that can select the wrong candidate or output abstentions.
+
+Finally, CPV-CoT is motivated partly by the desire to reduce ``confident wrong'' outputs via an explicit abstention option. In these runs, \texttt{abstention\_rate} and \texttt{wrong\_non\_abstain\_rate} were not logged in the run summaries, so we cannot quantify whether CPV-CoT reduced non-abstaining errors even while lowering accuracy. This gap highlights the importance of aligning logged diagnostics with the intended safety motivation when evaluating prompt-only verification pipelines.
+
+Overall, the recorded experiments demonstrate that cross-perspective verification is not automatically beneficial: in this evaluation setting, CPV-CoT yields lower accuracy at higher inference cost, despite frequently surfacing internal disagreement between its two perspectives.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \section{Discussion}
@@ -258,17 +342,17 @@ Limitations and interpretability of the negative result. The available metrics e
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \section{Conclusions}
 
-We investigated whether prompt-only verification can make Chain-of-Thought prompting more reliable for arithmetic word problems under a tight, bounded-call budget. CPV-CoT enforces a cross-representation check by generating two candidate answers from the same model (a narrative Forward-CoT and an equations-only solve) and invoking a constraint-focused adjudicator only when the two candidates disagree, with an explicit abstention option.
+We studied CPV-CoT, a prompt-only cross-perspective verification procedure for math word problems that pairs a narrative Chain-of-Thought solution with an independent equations-only re-solve and applies a disagreement-triggered adjudicator that checks candidate answers against problem constraints. The method is motivated by a specific brittleness of single-pass CoT: a free-form narrative does not constitute an explicit, testable contract, and same-style self-checking can reproduce the same hidden assumptions and errors.
 
-On 200-example test subsets of GSM8K and SVAMP using meta-llama\slash Meta-Llama-3.1-8B-Instruct{} with greedy decoding, CPV-CoT does not improve accuracy. Instead, accuracy drops from 0.720 to 0.625 on GSM8K and from 0.805 to 0.720 on SVAMP, while average calls per problem increase from 1.00 to 2.51 and 2.385, respectively. The call counts imply frequent disagreements approximately 51\% on GSM8K and 38.5\% on SVAMP, meaning the method often pays for adjudication but does not convert that extra compute into better final answers.
+In controlled greedy-decoding experiments with Meta-Llama-3.1-8B-Instruct on $200$-example test subsets of GSM8K and SVAMP, CPV-CoT increased compute to about $2.39$-$2.51$ model calls per problem but reduced accuracy relative to a single-pass zero-shot CoT baseline ($0.625$ vs $0.720$ on GSM8K; $0.720$ vs $0.805$ on SVAMP). Using call accounting implied by the method design, we inferred that disagreements were common (about $51\%$ on GSM8K and $38.5\%$ on SVAMP), confirming that the representation shift produces substantial divergence between the narrative and equations-only perspectives. Nevertheless, the adjudication step did not reliably convert this divergence into improved correctness under the present extraction and greedy decoding regime.
 
-These negative results refine the broader lesson that verification is not simply “more reasoning.” When the checker is the same base model and verification is not grounded by external execution, representation diversity can expose inconsistencies but still fail to resolve them correctly. Future work should add the missing diagnostics (explicit disagreements, abstention rates, and wrong-non-abstain rates) and explore decision rules or verification signals that make constraint satisfaction more mechanically testable rather than relying on additional free-form text generation.
+These negative results sharpen the empirical requirements for prompt-only verification. Representation change can surface inconsistencies, but improved end-to-end performance requires that the verifier and adjudicator be reliably complementary to the initial solve and robust to the same parsing constraints used for scoring. Future work should explicitly log disagreement outcomes and abstentions, refine prompts and output formats to reduce extraction brittleness, and examine how decoding choices interact with bounded multi-call verification.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \vspace{6pt}
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-\authorcontributions{For research articles with several authors, a short paragraph specifying their individual contributions must be provided. The following statements should be used: ``Conceptualization, X.X. and Y.Y.; methodology, X.X.; software, X.X.; validation, X.X., Y.Y. and Z.Z.; formal analysis, X.X.; investigation, X.X.; resources, X.X.; data curation, X.X.; writing---original draft preparation, X.X.; writing---review and editing, X.X.; visualization, X.X.; supervision, X.X.; project administration, X.X.; funding acquisition, Y.Y. All authors have read and agreed to the published version of the manuscript.'', please turn to the  \href{http://img.mdpi.org/data/contributor-role-instruction.pdf}{CRediT taxonomy} for the term explanation. Authorship must be limited to those who have contributed substantially to the work~reported.}
+\authorcontributions{For research articles with several authors, a short paragraph specifying their individual contributions must be provided. The following statements should be used ``Conceptualization, X.X. and Y.Y.; methodology, X.X.; software, X.X.; validation, X.X., Y.Y. and Z.Z.; formal analysis, X.X.; investigation, X.X.; resources, X.X.; data curation, X.X.; writing---original draft preparation, X.X.; writing---review and editing, X.X.; visualization, X.X.; supervision, X.X.; project administration, X.X.; funding acquisition, Y.Y. All authors have read and agreed to the published version of the manuscript.'', please turn to the  \href{http://img.mdpi.org/data/contributor-role-instruction.pdf}{CRediT taxonomy} for the term explanation. Authorship must be limited to those who have contributed substantially to the work~reported.}
 
 \funding{This research received no external funding.}
 
@@ -284,7 +368,7 @@ These negative results refine the broader lesson that verification is not simply
 %} % If the paper is ``preprints'', please uncomment this parenthesis.
 %\printendnotes[custom] % Un-comment to print a list of endnotes
 
-%\bibliographystyle{plainnat} % Commented out as MDPI class sets its own style
+\bibliographystyle{plainnat}
 \bibliography{references}
 
 \PublishersNote{}
