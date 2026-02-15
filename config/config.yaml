@@ -1,5 +1,5 @@
 # Main configuration for Hydra
-# This file will be populated by AI code generator based on experimental design
+# CPV-CoT: Cross-Perspective Verification Chain-of-Thought experiment
 
 defaults:
   - _self_
@@ -11,8 +11,11 @@ mode: main
 # Results output directory
 results_dir: .research/results
 
-# WandB configuration (will be set by AI agent)
+# Cache directory for models and datasets
+cache_dir: .cache
+
+# WandB configuration
 wandb:
-  entity: ???
-  project: ???
+  entity: airas
+  project: 2026-02-15-2
   mode: online

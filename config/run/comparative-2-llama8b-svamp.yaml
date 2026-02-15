@@ -1,0 +1,14 @@
+# Baseline: Zero-shot CoT on SVAMP
+run_id: comparative-2-llama8b-svamp
+method: zero_shot_cot
+model:
+  name: meta-llama/Meta-Llama-3.1-8B-Instruct
+  max_tokens: 512
+  temperature: 0.0
+dataset:
+  name: svamp
+  split: test
+  max_samples: 200
+inference:
+  batch_size: 1
+  num_workers: 0

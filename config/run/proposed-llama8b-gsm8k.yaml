@@ -1,0 +1,14 @@
+# Proposed: CPV-CoT on GSM8K
+run_id: proposed-llama8b-gsm8k
+method: cpv_cot
+model:
+  name: meta-llama/Meta-Llama-3.1-8B-Instruct
+  max_tokens: 512
+  temperature: 0.0
+dataset:
+  name: gsm8k
+  split: test
+  max_samples: 200
+inference:
+  batch_size: 1
+  num_workers: 0
