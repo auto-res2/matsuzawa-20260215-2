@@ -77,8 +77,20 @@ def fetch_wandb_run_data(entity: str, project: str, run_id: str) -> Dict[str, An
         history = run.history()
         history_dict = history.to_dict(orient='list') if not history.empty else {}
         
-        # Fetch summary metrics
-        summary = dict(run.summary)
+        # [VALIDATOR FIX - Attempt 2]
+        # [PROBLEM]: TypeError: Object of type SummarySubDict is not JSON serializable
+        # [CAUSE]: run.summary returns a SummarySubDict object which cannot be directly serialized to JSON;
+        #          dict(run.summary) creates a shallow copy that may still contain nested SummarySubDict objects
+        # [FIX]: Use json.loads(json.dumps(..., default=str)) to recursively convert all values to JSON-serializable types
+        #
+        # [OLD CODE]:
+        # summary = dict(run.summary)
+        #
+        # [NEW CODE]:
+        # Convert summary to JSON-serializable dict by first converting to JSON string and back
+        # Use default=str as fallback for any non-serializable objects
+        summary_raw = dict(run.summary)
+        summary = json.loads(json.dumps(summary_raw, default=str))
         
         # Fetch config
         config = dict(run.config)
