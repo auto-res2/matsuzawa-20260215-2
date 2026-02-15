@@ -13,14 +13,48 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 
+# [VALIDATOR FIX - Attempt 1]
+# [PROBLEM]: evaluate.py was being called with key=value syntax but expected --key value
+# [CAUSE]: Workflow passes results_dir="..." and run_ids="..." but argparse expects --results_dir ... --run_ids ...
+# [FIX]: Modified argument parser to accept both formats by preprocessing sys.argv
+#
+# [OLD CODE]:
+# def parse_args():
+#     """Parse command line arguments."""
+#     parser = argparse.ArgumentParser(description="Evaluate and compare experiment runs")
+#     parser.add_argument("--results_dir", type=str, required=True, help="Results directory path")
+#     parser.add_argument("--run_ids", type=str, required=True, help="JSON string list of run IDs")
+#     parser.add_argument("--wandb_entity", type=str, default="airas", help="WandB entity")
+#     parser.add_argument("--wandb_project", type=str, default="2026-02-15-2", help="WandB project")
+#     return parser.parse_args()
+#
+# [NEW CODE]:
 def parse_args():
-    """Parse command line arguments."""
+    """Parse command line arguments.
+    
+    Supports both formats:
+    - --key value (standard argparse)
+    - key=value (Hydra-style, used by workflow)
+    """
+    # Preprocess sys.argv to convert key=value to --key value
+    processed_argv = []
+    for arg in sys.argv[1:]:
+        if '=' in arg and not arg.startswith('--'):
+            # Split key=value into --key value
+            key, value = arg.split('=', 1)
+            processed_argv.append(f'--{key}')
+            processed_argv.append(value)
+        else:
+            processed_argv.append(arg)
+    
     parser = argparse.ArgumentParser(description="Evaluate and compare experiment runs")
     parser.add_argument("--results_dir", type=str, required=True, help="Results directory path")
     parser.add_argument("--run_ids", type=str, required=True, help="JSON string list of run IDs")
     parser.add_argument("--wandb_entity", type=str, default="airas", help="WandB entity")
     parser.add_argument("--wandb_project", type=str, default="2026-02-15-2", help="WandB project")
-    return parser.parse_args()
+    
+    # Parse the preprocessed arguments
+    return parser.parse_args(processed_argv)
 
 
 def fetch_wandb_run_data(entity: str, project: str, run_id: str) -> Dict[str, Any]:
@@ -270,6 +304,31 @@ def main():
     
     print(f"Evaluating runs: {run_ids}")
     print(f"Results directory: {results_dir}")
+    
+    # [VALIDATOR FIX - Attempt 1]
+    # [PROBLEM]: Visualization stage may be called before any runs complete
+    # [CAUSE]: Workflow can trigger visualization even when no run data exists
+    # [FIX]: Check if any run directories exist and warn if data is missing
+    #
+    # Check if any run directories exist
+    has_any_data = False
+    for run_id in run_ids:
+        run_dir = results_dir / run_id
+        metrics_file = results_dir / run_id / "metrics.json"
+        results_file = results_dir / run_id / "results.json"
+        if run_dir.exists() and (metrics_file.exists() or results_file.exists()):
+            has_any_data = True
+            break
+    
+    if not has_any_data:
+        print("\n" + "=" * 80)
+        print("WARNING: No run data found in results directory.")
+        print("This may be because:")
+        print("  1. The main experiment runs haven't completed yet")
+        print("  2. Run directories don't exist yet")
+        print("  3. Runs failed before generating any output")
+        print("\nThe script will still generate placeholder outputs.")
+        print("=" * 80 + "\n")
     
     # Fetch data for all runs
     run_data = {}
