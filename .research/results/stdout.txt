@@ -52,3 +52,46 @@ Generated files:
   - .research/results/comparison/comparison_calls.pdf
 ================================================================================
 === [VISUALIZATION] PASSED at Sun Feb 15 11:48:51 UTC 2026 ===
+=== [VISUALIZATION] Start at Sun Feb 15 12:47:16 UTC 2026 ===
+Evaluating runs: ['comparative-1-llama8b-gsm8k', 'comparative-2-llama8b-svamp', 'proposed-llama8b-gsm8k', 'proposed-llama8b-svamp']
+Results directory: .research/results
+
+Processing run: comparative-1-llama8b-gsm8k
+Exported metrics to: .research/results/comparative-1-llama8b-gsm8k/metrics.json
+Generated: .research/results/comparative-1-llama8b-gsm8k/comparative-1-llama8b-gsm8k_accuracy.pdf
+
+Processing run: comparative-2-llama8b-svamp
+Exported metrics to: .research/results/comparative-2-llama8b-svamp/metrics.json
+Generated: .research/results/comparative-2-llama8b-svamp/comparative-2-llama8b-svamp_accuracy.pdf
+
+Processing run: proposed-llama8b-gsm8k
+Exported metrics to: .research/results/proposed-llama8b-gsm8k/metrics.json
+Generated: .research/results/proposed-llama8b-gsm8k/proposed-llama8b-gsm8k_accuracy.pdf
+
+Processing run: proposed-llama8b-svamp
+Exported metrics to: .research/results/proposed-llama8b-svamp/metrics.json
+Generated: .research/results/proposed-llama8b-svamp/proposed-llama8b-svamp_accuracy.pdf
+
+Aggregated metrics saved to: .research/results/comparison/aggregated_metrics.json
+
+Generating comparison plots...
+Generated: .research/results/comparison/comparison_accuracy.pdf
+Generated: .research/results/comparison/comparison_accuracy_bar.pdf
+Generated: .research/results/comparison/comparison_calls.pdf
+
+================================================================================
+Evaluation Summary:
+================================================================================
+Runs evaluated: 4
+Primary metric: accuracy
+Best proposed: 0.7200
+Best baseline: 0.8050
+Gap (proposed - baseline): -0.0850
+
+Generated files:
+  - .research/results/comparison/aggregated_metrics.json
+  - .research/results/comparison/comparison_accuracy.pdf
+  - .research/results/comparison/comparison_accuracy_bar.pdf
+  - .research/results/comparison/comparison_calls.pdf
+================================================================================
+=== [VISUALIZATION] PASSED at Sun Feb 15 12:47:25 UTC 2026 ===
