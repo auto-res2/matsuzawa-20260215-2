@@ -1,0 +1,14 @@
+{
+  "_runtime": 1699,
+  "_step": 199,
+  "_timestamp": 1771146461.5830543,
+  "_wandb": "{'runtime': 1699}",
+  "accuracy": 0.72,
+  "avg_calls": 1,
+  "avg_calls_per_problem": 1,
+  "correct": 1,
+  "correct_count": 144,
+  "sample_idx": 199,
+  "total_calls": 200,
+  "total_samples": 200
+}

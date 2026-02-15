@@ -1,0 +1,24 @@
+{
+  "primary_metric": "accuracy",
+  "metrics": {
+    "comparative-1-llama8b-gsm8k": {
+      "accuracy": 0.72,
+      "avg_calls_per_problem": 1
+    },
+    "comparative-2-llama8b-svamp": {
+      "accuracy": 0.805,
+      "avg_calls_per_problem": 1
+    },
+    "proposed-llama8b-gsm8k": {
+      "accuracy": 0.625,
+      "avg_calls_per_problem": 2.51
+    },
+    "proposed-llama8b-svamp": {
+      "accuracy": 0.72,
+      "avg_calls_per_problem": 2.385
+    }
+  },
+  "best_proposed": 0.72,
+  "best_baseline": 0.805,
+  "gap": -0.08500000000000008
+}
