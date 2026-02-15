@@ -40,11 +40,27 @@ def load_math_dataset(dataset_name: str, split: str, cache_dir: str, max_samples
         for idx, item in enumerate(dataset):
             if max_samples and idx >= max_samples:
                 break
+            # [VALIDATOR FIX - Attempt 1]
+            # [PROBLEM]: 0% accuracy - questions are incomplete, missing problem context
+            # [CAUSE]: SVAMP dataset has separate "Body" (context) and "Question" fields. 
+            #          Original code: item.get("Question", item.get("Body", "") + " " + item.get("Question", ""))
+            #          This uses Question as primary, only combining Body+Question as fallback - WRONG!
+            # [FIX]: Always combine Body + Question to form complete problem text
+            #
+            # [OLD CODE]:
+            # question": item.get("Question", item.get("Body", "") + " " + item.get("Question", "")),
+            #
+            # [NEW CODE]:
+            body = item.get("Body", "")
+            question = item.get("Question", "")
+            # Combine body and question with proper spacing
+            full_question = f"{body} {question}".strip() if body else question
+            
             # SVAMP has direct numeric answer
             answer_num = str(item.get("Answer", item.get("answer", "")))
             processed.append({
                 "id": f"svamp_{split}_{idx}",
-                "question": item.get("Question", item.get("Body", "") + " " + item.get("Question", "")),
+                "question": full_question,
                 "answer": normalize_number(answer_num),
                 "raw_answer": answer_num
             })
